@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, make_response, request
 from flask_restx import Api, Resource, fields, reqparse
-from librus_apix.exceptions import AuthorizationError, TokenError
+from librus_apix.exceptions import AuthorizationError, TokenError, DateError
 from librus_apix.get_token import get_token, Token
 from librus_apix.messages import get_recieved, message_content
 from librus_apix.grades import get_grades
@@ -43,18 +43,18 @@ class Message(Resource):
     def get(self, page):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            msgs = dictify(get_recieved(token, page))
-        except TokenError() as tokenErr:
-            msgs = {'error': tokenErr}
+            msgs = dictify(get_recieved(token, page)), 200
+        except TokenError as token_err:
+            msgs = {'error': str(token_err)}, 401
         return msgs
 @api.route('/messages/content/<string:content_url>')
 class MessageContent(Resource):
     def get(self, content_url: str):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            content = message_content(token, content_url)
-        except TokenError() as tokenErr:
-            content = {'error': tokenErr}
+            content = message_content(token, content_url), 200
+        except TokenError as token_err:
+            content = {'error': str(token_err)}, 401
         return content
 @api.route('/grades/<int:semester>')
 class Grades(Resource):
@@ -67,48 +67,51 @@ class Grades(Resource):
             token = Token(request.headers.get("X-API-KEY"))
             g = get_grades(token)
             grades = {}
+            status_code = 200
             for subject in g[semester]:
                 grades[subject] = list(map(to_dict, g[semester][subject]))
+        except TokenError as token_err:
+           grades = {'error': str(token_err)}
+           status_code = 401
 
-        except TokenError() as tokenErr:
-           grades = {'error': tokenErr}
-        
-        return grades
+        return grades, status_code
+
 @api.route('/attendance/<int:semester>')
 class Attendance(Resource):
     def get(self, semester: int):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            attendance = dictify(get_attendance(token)[semester])
-        except TokenError() as tokenErr:
-           attendance = {'error': tokenErr}
+            attendance = dictify(get_attendance(token)[semester]), 200
+        except TokenError as token_err:
+           attendance = {'error': str(token_err)}, 401
         return attendance
 @api.route('/attendance/details/<string:detail_url>')
 class AttendanceDetail(Resource):
     def get(self, detail_url: str):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            detail = get_detail(token, detail_url)
-        except TokenError() as tokenErr:
-            detail = {'error': tokenErr}
+            detail = get_detail(token, detail_url), 200
+        except TokenError as token_err:
+            detail = {'error': str(token_err)}, 401
         return detail
 @api.route('/schedule/<string:year>/<string:month>')
 class Schedule(Resource):
     def get(self, year: str, month: str):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            schedule = dictify(get_schedule(token, month, year))
-        except TokenError() as tokenErr:
-            schedule = {'error': tokenErr}
+            schedule = get_schedule(token, month, year)
+            schedule = {key: dictify(val) for key,val in schedule.items()}, 200
+        except TokenError as token_err:
+            schedule = {'error': str(token_err)}, 401
         return schedule
 @api.route('/schedule/details/<string:detail_prefix>/<string:detail_url>')
 class ScheduleDetail(Resource):
     def get(self, detail_prefix: str, detail_url: str):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            details = schedule_detail(token, detail_prefix, detail_url)
-        except TokenError() as tokenErr:
-            details = {'error': tokenErr}
+            details = schedule_detail(token, detail_prefix, detail_url), 200
+        except TokenError as token_err:
+            details = {'error': str(token_err)}, 401
         return details
 @api.route('/timetable/<string:monday_date>')
 class Timetable(Resource):
@@ -116,35 +119,38 @@ class Timetable(Resource):
         try:
             token = Token(request.headers.get("X-API-KEY"))
             timetable = get_timetable(token, datetime.strptime(monday_date, '%Y-%m-%d'))
-        except TokenError() as tokenErr:
-            timetable = {'error': tokenErr}
+            timetable = {key: dictify(val) for key,val in timetable.items()}, 200
+        except TokenError as token_err:
+            timetable = {'error': str(token_err)}, 401
+        except DateError as date_err:
+            timetable = {'error': str(date_err)}, 401
         return timetable
 @api.route('/announcements')
 class Announcements(Resource):
     def get(self):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            announcements = dictify(get_announcements(token))
-        except TokenError() as tokenErr:
-            announcements = {'error': tokenErr}
+            announcements = dictify(get_announcements(token)), 200
+        except TokenError as token_err:
+            announcements = {'error': str(token_err)}, 401
         return announcements
 @api.route('/homework/details/<string:detail_url>')
 class HomeworkDetails(Resource):
     def get(self, detail_url: str):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            details = homework_detail(token, detail_url)
-        except TokenError() as tokenErr:
-            details = {'error': tokenErr}
+            details = homework_detail(token, detail_url), 200
+        except TokenError as token_err:
+            details = {'error': str(token_err)}, 401
         return details
 @api.route('/homework/<string:date_from>/<string:date_to>')
 class Homework(Resource):
     def get(self, date_from: str, date_to: str):
         try:
             token = Token(request.headers.get("X-API-KEY"))
-            homework = dictify(get_homework(token, date_from, date_to))
-        except TokenError() as tokenErr:
-            homework = {'error': tokenErr}
+            homework = dictify(get_homework(token, date_from, date_to)), 200
+        except TokenError as token_err:
+            homework = {'error': str(token_err)}, 401
         return homework
 
 if __name__ == '__main__':

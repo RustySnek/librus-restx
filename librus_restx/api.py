@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, make_response, request
 from flask_restx import Api, Resource, fields, reqparse
-from librus_apix.exceptions import AuthorizationError, TokenError, DateError
+from librus_apix.exceptions import AuthorizationError, TokenError, DateError, MaintananceError
 from librus_apix.get_token import get_token, Token
 from librus_apix.messages import get_recieved, message_content
 from librus_apix.grades import get_grades
@@ -10,6 +10,7 @@ from librus_apix.timetable import get_timetable
 from datetime import datetime
 from librus_apix.announcements import get_announcements
 from librus_apix.homework import get_homework, homework_detail
+from json import JSONDecodeError
 
 app = Flask(__name__)
 api = Api(app)
@@ -18,9 +19,6 @@ model = api.model('Login', {
     'username': fields.String,
     'password': fields.String
 })
-
-#def header_to_token(auth_header: str):
-#    token = Token(request.headers.get(auth_header))
 
 def dictify(_list: list):
     return [val.__dict__ for val in _list]
@@ -32,6 +30,8 @@ class Login(Resource):
         try:
             token = get_token(api.payload['username'], api.payload['password'])
             return {"X-API-Key": token.API_Key}, 200
+        except MaintananceError as err:
+            return {"Maintanance": str(err)}, 503
         except KeyError:
             return {"error": "Provide a proper Authorization header"}, 401
         except AuthorizationError as AuthError:
@@ -68,6 +68,7 @@ class Grades(Resource):
             g = get_grades(token)
             grades = {}
             status_code = 200
+            print(g)
             for subject in g[semester]:
                 grades[subject] = list(map(to_dict, g[semester][subject]))
         except TokenError as token_err:

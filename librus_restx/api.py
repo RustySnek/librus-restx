@@ -64,7 +64,7 @@ class Grades(Resource):
             initial.update({"value": obj.value})
             return initial
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             g = get_grades(token)
             grades = {}
             status_code = 200
@@ -81,7 +81,7 @@ class Grades(Resource):
 class Attendance(Resource):
     def get(self, semester: int):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             attendance = dictify(get_attendance(token)[semester]), 200
         except TokenError as token_err:
            attendance = {'error': str(token_err)}, 401
@@ -90,7 +90,7 @@ class Attendance(Resource):
 class AttendanceDetail(Resource):
     def get(self, detail_url: str):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             detail = get_detail(token, detail_url), 200
         except TokenError as token_err:
             detail = {'error': str(token_err)}, 401
@@ -99,7 +99,7 @@ class AttendanceDetail(Resource):
 class Schedule(Resource):
     def get(self, year: str, month: str):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             schedule = get_schedule(token, month, year)
             schedule = {key: dictify(val) for key,val in schedule.items()}, 200
         except TokenError as token_err:
@@ -109,7 +109,7 @@ class Schedule(Resource):
 class ScheduleDetail(Resource):
     def get(self, detail_prefix: str, detail_url: str):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             details = schedule_detail(token, detail_prefix, detail_url), 200
         except TokenError as token_err:
             details = {'error': str(token_err)}, 401
@@ -118,7 +118,7 @@ class ScheduleDetail(Resource):
 class Timetable(Resource):
     def get(self, monday_date: str):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             timetable = get_timetable(token, datetime.strptime(monday_date, '%Y-%m-%d'))
             timetable = {key: dictify(val) for key,val in timetable.items()}, 200
         except TokenError as token_err:
@@ -130,7 +130,7 @@ class Timetable(Resource):
 class Announcements(Resource):
     def get(self):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             announcements = dictify(get_announcements(token)), 200
         except TokenError as token_err:
             announcements = {'error': str(token_err)}, 401
@@ -139,7 +139,7 @@ class Announcements(Resource):
 class HomeworkDetails(Resource):
     def get(self, detail_url: str):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             details = homework_detail(token, detail_url), 200
         except TokenError as token_err:
             details = {'error': str(token_err)}, 401
@@ -148,7 +148,7 @@ class HomeworkDetails(Resource):
 class Homework(Resource):
     def get(self, date_from: str, date_to: str):
         try:
-            token = Token(request.headers.get("X-API-KEY"))
+            token = Token(request.headers.get("X-API-Key"))
             homework = dictify(get_homework(token, date_from, date_to)), 200
         except TokenError as token_err:
             homework = {'error': str(token_err)}, 401

@@ -19,6 +19,10 @@ model = api.model('Login', {
     'username': fields.String,
     'password': fields.String
 })
+overview_model = api.model('Overview', {
+    'last_login_date': fields.String, # YY-MM-DD
+    'last_login_time': fields.String, # HH:MM:SS
+    })
 
 def dictify(_list: list):
     return [val.__dict__ for val in _list]
@@ -56,19 +60,72 @@ class MessageContent(Resource):
         except TokenError as token_err:
             content = {'error': str(token_err)}, 401
         return content
+
+@api.route('/overview')
+class Overview(Resource):
+    @api.doc(model=overview_model)
+    def post(self):
+        try:
+            last_login_date = api.payload['last_login_date']
+            last_login_time = api.payload['last_login_time']
+            last_login = datetime.strptime(" ".join([last_login_date, last_login_time]), '%Y-%m-%d %H:%M:%S')
+        except KeyError:
+            return {"Error": 'Please provide a proper date and time headers.'}, 401
+        except ValueError:
+            return {"Error": "Please provide a proper date/time values. YY-MM-DD / HH:MM:SS"}, 401
+
+        def to_dict(obj):
+                    initial = obj.__dict__
+                    try:
+                        initial.update({"value": obj.value})
+                    except:
+                        pass
+                    return initial
+
+        try:
+            token = Token(request.headers.get('X-API-Key'))
+
+            grades = get_grades(token, 'zmiany_logowanie')
+            converted_grades = {}
+            status_code = 200
+            for semester in grades:
+                for subject in grades[semester]:
+                    converted_grades[subject] = list(map(to_dict, grades[semester][subject]))
+            attendance = list(map(dictify, get_attendance(token, {'zmiany_logowanie': 'zmiany_logowanie'}).values()))
+            messages = get_recieved(token, 0)
+            new_messages = []
+            for message in messages:
+                if datetime.strptime(message.date, '%Y-%m-%d %H:%M:%S') > last_login:
+                    new_messages.append(message.__dict__)
+            announcements = get_announcements(token)
+            new_announcements = []
+            for announcement in announcements:
+                if datetime.strptime(announcement.date, '%Y-%m-%d') > last_login:
+                    new_announcements.append(announcement.__dict__)
+
+        except TokenError as token_err:
+            converted_grades = {'error': str(token_err)} 
+            status_code = 401 
+            attendance = {'error': str(token_err)}
+            new_messages = {'error': str(token_err)}
+            new_announcements = {'error': str(token_err)}
+        return {'Grades': converted_grades, 'Attendance': attendance, 'Messages': new_messages, 'Announcements': new_announcements}, status_code
+
 @api.route('/grades/<int:semester>')
 class Grades(Resource):
     def get(self, semester: int):
         def to_dict(obj):
             initial = obj.__dict__
-            initial.update({"value": obj.value})
+            try:
+                initial.update({"value": obj.value})
+            except:
+                pass
             return initial
         try:
             token = Token(request.headers.get("X-API-Key"))
-            g = get_grades(token)
+            g = get_grades(token, 'zmiany_logowanie_wszystkie')
             grades = {}
             status_code = 200
-            print(g)
             for subject in g[semester]:
                 grades[subject] = list(map(to_dict, g[semester][subject]))
         except TokenError as token_err:
@@ -82,7 +139,7 @@ class Attendance(Resource):
     def get(self, semester: int):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            attendance = dictify(get_attendance(token)[semester]), 200
+            attendance = dictify(get_attendance(token, {'zmiany_logowanie_wszystkie': ''})[semester]), 200
         except TokenError as token_err:
            attendance = {'error': str(token_err)}, 401
         return attendance
@@ -114,12 +171,12 @@ class ScheduleDetail(Resource):
         except TokenError as token_err:
             details = {'error': str(token_err)}, 401
         return details
-@api.route('/timetable/<string:monday_date>')
+@api.route('/timetable/<string:year>/<string:month>/<string:day>')
 class Timetable(Resource):
-    def get(self, monday_date: str):
+    def get(self, **kwargs):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            timetable = get_timetable(token, datetime.strptime(monday_date, '%Y-%m-%d'))
+            timetable = get_timetable(token, datetime.strptime('-'.join(kwargs.values()), '%Y-%m-%d'))
             timetable = {key: dictify(val) for key,val in timetable.items()}, 200
         except TokenError as token_err:
             timetable = {'error': str(token_err)}, 401

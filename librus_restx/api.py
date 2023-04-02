@@ -11,6 +11,7 @@ from datetime import datetime
 from librus_apix.announcements import get_announcements
 from librus_apix.homework import get_homework, homework_detail
 from json import JSONDecodeError
+from collections import defaultdict
 
 app = Flask(__name__)
 api = Api(app)
@@ -85,7 +86,7 @@ class Overview(Resource):
         try:
             token = Token(request.headers.get('X-API-Key'))
 
-            grades = get_grades(token, 'zmiany_logowanie')
+            grades = get_grades(token, 'zmiany_logowanie')[0]
             converted_grades = {}
             status_code = 200
             for semester in grades:
@@ -111,9 +112,30 @@ class Overview(Resource):
             new_announcements = {'error': str(token_err)}
         return {'Grades': converted_grades, 'Attendance': attendance, 'Messages': new_messages, 'Announcements': new_announcements}, status_code
 
-@api.route('/grades/<int:semester>')
+@api.route('/grades')
 class Grades(Resource):
-    def get(self, semester: int):
+    def get(self) -> dict[str, dict]:
+        """
+        Returns a dictionary containing Grades and GPA (Average Grades) {"Grades": ..., "Gpa": ...}
+        Grades values contain both semesters as dictionaries inside a list [{"Biology": [...], [...]}, {"Biology": [...], [...]}]
+        Each subject inside a semester contains a list of all grades. A grade is a dictionary with all the grade attributes.
+        Gpa values contain a dictionary with Subject names as keys and a list of semesters avg. and final avg. 
+        GPA structure: {
+                "Biology": [{"gpa": 3.0}, {"gpa": 4.3}], 
+                "History": [{"gpa: 2.1"}, {"gpa": 1.2}],
+                } 
+        Grades structure: [
+                { # First Semester
+                    "Biology": [dicts of grades],
+                    "History": [dicts of grades],
+                    ...
+                    },
+                { # Second Semester
+                    "Biology": [dicts of grades],
+                    ...
+                    }
+                ]
+        """
         def to_dict(obj):
             initial = obj.__dict__
             try:
@@ -124,15 +146,22 @@ class Grades(Resource):
         try:
             token = Token(request.headers.get("X-API-Key"))
             g = get_grades(token, 'zmiany_logowanie_wszystkie')
-            grades = {}
+            avg_grades: dict = g[1]
+            g = g[0]
+            grades = [defaultdict(list), defaultdict(list)]
             status_code = 200
-            for subject in g[semester]:
-                grades[subject] = list(map(to_dict, g[semester][subject]))
+            for semester in g:
+                for subject in g[semester]:
+                    grades[semester-1][subject] = list(map(to_dict, g[semester][subject]))
+            for subject in avg_grades:
+                avg_grades[subject] = dictify(list(avg_grades[subject]))
+
         except TokenError as token_err:
            grades = {'error': str(token_err)}
+           avg_grades = {'error': str(token_err)}
            status_code = 401
-
-        return grades, status_code
+        
+        return {'Grades': grades, 'Gpa': avg_grades}, status_code
 
 @api.route('/attendance/<int:semester>')
 class Attendance(Resource):

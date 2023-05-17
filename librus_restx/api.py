@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify, make_response, request
 from flask_restx import Api, Resource, fields, reqparse
-from librus_apix.exceptions import AuthorizationError, TokenError, DateError, MaintananceError
+from librus_apix.exceptions import AuthorizationError, TokenError, DateError, MaintananceError, ParseError
 from librus_apix.get_token import get_token, Token
-from librus_apix.messages import get_recieved, message_content
+from librus_apix.messages import get_recieved, message_content, get_max_page_number
 from librus_apix.grades import get_grades
 from librus_apix.attendance import get_attendance, get_detail
 from librus_apix.schedule import get_schedule, schedule_detail
@@ -41,7 +41,18 @@ class Login(Resource):
             return {"error": "Provide a proper Authorization header"}, 401
         except AuthorizationError as AuthError:
             return {"error": str(AuthError)}, 401
-        
+
+@api.route('/messages/pages')
+class MessagePages(Resource):
+    @api.header("X-API-Key", type=[str])
+    def get(self):
+        try:
+            token = Token(request.headers.get("X-API-Key"))
+            max_number = {"max_page": get_max_page_number(token)-1}, 200
+        except TokenError as err:
+            max_number = {"error": str(err)}, 401
+        return max_number
+
 @api.route('/messages/<int:page>')
 class Message(Resource):
     @api.header("X-API-Key", type=[str])
@@ -105,25 +116,25 @@ class Overview(Resource):
                     new_announcements.append(announcement.__dict__)
 
         except TokenError as token_err:
-            converted_grades = {'error': str(token_err)} 
-            status_code = 401 
+            converted_grades = {'error': str(token_err)}
+            status_code = 401
             attendance = {'error': str(token_err)}
             new_messages = {'error': str(token_err)}
             new_announcements = {'error': str(token_err)}
         return {'Grades': converted_grades, 'Attendance': attendance, 'Messages': new_messages, 'Announcements': new_announcements}, status_code
 
-@api.route('/grades')
+@api.route('/grades/<string:sort_by>')
 class Grades(Resource):
-    def get(self) -> dict[str, dict]:
+    def get(self, sort_by: str) -> tuple[dict, int]:
         """
         Returns a dictionary containing Grades and GPA (Average Grades) {"Grades": ..., "Gpa": ...}
         Grades values contain both semesters as dictionaries inside a list [{"Biology": [...], [...]}, {"Biology": [...], [...]}]
         Each subject inside a semester contains a list of all grades. A grade is a dictionary with all the grade attributes.
-        Gpa values contain a dictionary with Subject names as keys and a list of semesters avg. and final avg. 
+        Gpa values contain a dictionary with Subject names as keys and a list of semesters avg. and final avg.
         GPA structure: {
-                "Biology": [{"gpa": 3.0}, {"gpa": 4.3}], 
+                "Biology": [{"gpa": 3.0}, {"gpa": 4.3}],
                 "History": [{"gpa: 2.1"}, {"gpa": 1.2}],
-                } 
+                }
         Grades structure: [
                 { # First Semester
                     "Biology": [dicts of grades],
@@ -145,14 +156,12 @@ class Grades(Resource):
             return initial
         try:
             token = Token(request.headers.get("X-API-Key"))
-            g = get_grades(token, 'zmiany_logowanie_wszystkie')
-            avg_grades: dict = g[1]
-            g = g[0]
+            all_grades, avg_grades = get_grades(token, sort_by)
             grades = [defaultdict(list), defaultdict(list)]
             status_code = 200
-            for semester in g:
-                for subject in g[semester]:
-                    grades[semester-1][subject] = list(map(to_dict, g[semester][subject]))
+            for semester in all_grades:
+                for subject in all_grades[semester]:
+                    grades[semester-1][subject] = list(map(to_dict, all_grades[semester][subject]))
             for subject in avg_grades:
                 avg_grades[subject] = dictify(list(avg_grades[subject]))
 
@@ -160,15 +169,15 @@ class Grades(Resource):
            grades = {'error': str(token_err)}
            avg_grades = {'error': str(token_err)}
            status_code = 401
-        
+
         return {'Grades': grades, 'Gpa': avg_grades}, status_code
 
-@api.route('/attendance/<int:semester>')
+@api.route('/attendance/')
 class Attendance(Resource):
-    def get(self, semester: int):
+    def get(self):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            attendance = dictify(get_attendance(token, {'zmiany_logowanie_wszystkie': ''})[semester]), 200
+            attendance = list(map(dictify, [_a for _a in get_attendance(token, {'zmiany_logowanie_wszystkie': ''})])), 200
         except TokenError as token_err:
            attendance = {'error': str(token_err)}, 401
         return attendance
@@ -186,8 +195,10 @@ class Schedule(Resource):
     def get(self, year: str, month: str):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            schedule = get_schedule(token, month, year)
-            schedule = {key: dictify(val) for key,val in schedule.items()}, 200
+            _schedule = get_schedule(token, month, year)
+            schedule = defaultdict(list)
+            for day in _schedule:
+                schedule[day] = dictify(_schedule[day])
         except TokenError as token_err:
             schedule = {'error': str(token_err)}, 401
         return schedule
@@ -235,9 +246,15 @@ class Homework(Resource):
     def get(self, date_from: str, date_to: str):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            homework = dictify(get_homework(token, date_from, date_to)), 200
+            homework = get_homework(token, date_from, date_to)
+            if len(homework) > 0:
+                homework = dictify(homework), 200
+            else:
+                homework = {'No homework found.': ''}
         except TokenError as token_err:
             homework = {'error': str(token_err)}, 401
+        except ParseError as parse_err:
+            homework = {'No homework found.': ''}, 206
         return homework
 
 if __name__ == '__main__':

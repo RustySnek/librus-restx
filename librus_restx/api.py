@@ -48,7 +48,7 @@ class MessagePages(Resource):
     def get(self):
         try:
             token = Token(request.headers.get("X-API-Key"))
-            max_number = {"max_page": get_max_page_number(token)-1}, 200
+            max_number = {"max_page": get_max_page_number(token)}, 200
         except TokenError as err:
             max_number = {"error": str(err)}, 401
         return max_number
@@ -75,6 +75,9 @@ class MessageContent(Resource):
 
 @api.route('/overview')
 class Overview(Resource):
+    """
+    format: %Y-%m-%d %H:%M:%S
+    """
     @api.doc(model=overview_model)
     def post(self):
         try:
@@ -97,13 +100,13 @@ class Overview(Resource):
         try:
             token = Token(request.headers.get('X-API-Key'))
 
-            grades = get_grades(token, 'zmiany_logowanie')[0]
+            grades = get_grades(token, 'last_login')[0]
             converted_grades = {}
             status_code = 200
             for semester in grades:
                 for subject in grades[semester]:
                     converted_grades[subject] = list(map(to_dict, grades[semester][subject]))
-            attendance = list(map(dictify, get_attendance(token, {'zmiany_logowanie': 'zmiany_logowanie'}).values()))
+            attendance = list(map(dictify, [at for at in get_attendance(token)]))
             messages = get_recieved(token, 0)
             new_messages = []
             for message in messages:

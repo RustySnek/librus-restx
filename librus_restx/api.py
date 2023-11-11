@@ -13,9 +13,10 @@ from librus_apix.homework import get_homework, homework_detail
 from json import JSONDecodeError
 from collections import defaultdict
 
+from flask_cors import CORS
 app = Flask(__name__)
 api = Api(app)
-
+CORS(app, support_credentials=True, resources={r"/*": {"origins": "*"}})
 model = api.model('Login', {
     'username': fields.String,
     'password': fields.String
@@ -261,4 +262,4 @@ class Homework(Resource):
         return homework
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", debug=True)

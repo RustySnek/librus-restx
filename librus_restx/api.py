@@ -22,8 +22,8 @@ model = api.model('Login', {
     'password': fields.String
 })
 overview_model = api.model('Overview', {
-    'last_login_date': fields.String, # YY-MM-DD
-    'last_login_time': fields.String, # HH:MM:SS
+    'last_login_date': fields.String,
+    'last_login_time': fields.String,
     })
 
 def dictify(_list: list):
@@ -101,12 +101,19 @@ class Overview(Resource):
         try:
             token = Token(request.headers.get('X-API-Key'))
 
-            grades = get_grades(token, 'last_login')[0]
+            grades = get_grades(token, 'all')[0]
             converted_grades = {}
             status_code = 200
             for semester in grades:
+                converted_grades[semester] = {}
                 for subject in grades[semester]:
-                    converted_grades[subject] = list(map(to_dict, grades[semester][subject]))
+                    
+                    converted_grades[semester][subject] = []
+                    for grade in grades[semester][subject]:
+                        if datetime.strptime(grade.date, "%Y-%m-%d") < last_login:
+                            continue
+                        else:
+                            converted_grades[semester][subject].append(grade.__dict__)
             attendance = list(map(dictify, [at for at in get_attendance(token)]))
             messages = get_recieved(token, 0)
             new_messages = []

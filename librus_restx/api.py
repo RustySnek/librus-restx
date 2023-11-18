@@ -114,7 +114,10 @@ class Overview(Resource):
                             continue
                         else:
                             converted_grades[semester][subject].append(grade.__dict__)
-            attendance = list(map(dictify, [at for at in get_attendance(token)]))
+            dictify_attendance = list(map(dictify, [at for at in get_attendance(token)]))
+            attendance = []
+            for _semester in dictify_attendance:
+                attendance.append(list(filter(lambda x: datetime.strptime(x["date"], "%Y-%m-%d") > last_login, _semester)))
             messages = get_recieved(token, 0)
             new_messages = []
             for message in messages:

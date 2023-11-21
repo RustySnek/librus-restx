@@ -170,10 +170,14 @@ class Grades(Resource):
             return initial
         try:
             token = Token(request.headers.get("X-API-Key"))
-            all_grades, avg_grades = get_grades(token, sort_by)
+            all_grades, avg_grades, descriptive_grades = get_grades(token, sort_by)
+            descriptive = [defaultdict(list), defaultdict(list)]
             grades = [defaultdict(list), defaultdict(list)]
             status_code = 200
             for semester in all_grades:
+    
+                for sub in descriptive_grades[semester]:
+                    descriptive[semester] = dictify(sub)
                 for subject in all_grades[semester]:
                     grades[semester-1][subject] = list(map(to_dict, all_grades[semester][subject]))
             for subject in avg_grades:
@@ -184,7 +188,7 @@ class Grades(Resource):
            avg_grades = {'error': str(token_err)}
            status_code = 401
 
-        return {'Grades': grades, 'Gpa': avg_grades}, status_code
+        return {'Grades': grades, 'Gpa': avg_grades, "Descriptive": descriptive}, status_code
 
 @api.route('/attendance/')
 class Attendance(Resource):
@@ -264,11 +268,11 @@ class Homework(Resource):
             if len(homework) > 0:
                 homework = dictify(homework), 200
             else:
-                homework = {'No homework found.': ''}
+                homework =  [], 206
         except TokenError as token_err:
             homework = {'error': str(token_err)}, 401
         except ParseError as parse_err:
-            homework = {'No homework found.': ''}, 206
+            homework = {'error': str(parse_err)}, 206
         return homework
 
 if __name__ == '__main__':

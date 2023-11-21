@@ -11,5 +11,4 @@ def test_homework():
     date_from = date_to - timedelta(days=31)
     status, homework = get_homework(date_from, date_to)
     assert status == 200 or status == 206
-    assert isinstance(homework, dict)
-
+    assert isinstance(homework, list)
